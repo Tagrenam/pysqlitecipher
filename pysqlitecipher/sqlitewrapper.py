@@ -6,7 +6,7 @@ import hashlib
 import onetimepad
 import json
 import random
-
+from uuid import uuid4
 
 class Shuffler:
     
@@ -342,9 +342,9 @@ class SqliteCipher:
         # by default a primary key ID is used to perform update , delete operations
         # this ID is automatically mantained , so no need to pass it in insert list while inserting data to table
         if(makeSecure):
-            stringToExecute = "CREATE TABLE {}".format(tableName) + " ( '{}' TEXT PRIMARY KEY NOT NULL , ".format(self.encryptor('ID_I'))
+            stringToExecute = "CREATE TABLE {}".format(tableName) + " ( '{}' TEXT PRIMARY KEY NOT NULL , ".format(self.encryptor('ID_T'))
         else:
-            stringToExecute = "CREATE TABLE {}".format(tableName) + " ( 'ID_I' TEXT PRIMARY KEY NOT NULL , "
+            stringToExecute = "CREATE TABLE {}".format(tableName) + " ( 'ID_T' TEXT PRIMARY KEY NOT NULL , "
 
 
         # traverse col list to add colname and data types to stringToExecute
@@ -543,38 +543,18 @@ class SqliteCipher:
         else:
             result = self.sqlObj.execute("SELECT * FROM '{}';".format(tableName))
 
-        # getting the last ID value
-        lastKeyFromTable = None
+        # generate ID
+        uuid = uuid4()
 
-        for i in result:
-            lastKeyFromTable = i[0]
-
-        # if the table is secured we need to perform encryption decryption operations
         if(secured):
-
-            # if no data in table
-            if(lastKeyFromTable == None):
-
-                # init ID as 0
-                lastKeyFromTable = self.encryptor('0')
-            else:
-
-                # else get ID , decrypt it , increament it ,  encrypt it back
-                lastKeyFromTable = self.decryptor(lastKeyFromTable)
-                lastKeyFromTable = int(lastKeyFromTable) + 1
-                lastKeyFromTable = self.encryptor(str(lastKeyFromTable))
-
-        # if table is not secured we just skip encryption and decryption
+                # encrypt ID
+                uuid = self.encryptor(str(uuid))
         else:
-            if(lastKeyFromTable == None):
-                lastKeyFromTable = '0'
-            else:
-                lastKeyFromTable = int(lastKeyFromTable) + 1
-                lastKeyFromTable = str(lastKeyFromTable)
+                uuid = str(uuid)
                 
             
         # adding the ID value to value list
-        stringToExecute = stringToExecute[:-1] + ") VALUES ( '{}' , ".format(lastKeyFromTable)
+        stringToExecute = stringToExecute[:-1] + ") VALUES ( '{}' , ".format(uuid)
 
         # adding None if the the insertList as less value than col list
         if(((len(colList) - 1)  > len(insertList))):
@@ -622,6 +602,7 @@ class SqliteCipher:
         if(commit):
             self.sqlObj.commit()
 
+        return uuid
 
 
     # function to get the all data from table
@@ -725,7 +706,7 @@ class SqliteCipher:
         # if the user does not want ID col which is auto maintained and inserted to be returned
         if(omitID):
             colList = colList[1:]
-            
+
             newValueList = []
 
             for i in valueList:
@@ -739,7 +720,7 @@ class SqliteCipher:
 
     # function to delete a row based on ID value
     # if raiseError is True , a error will be raised if ID is not found , but this may result in performance impact as now function as check for ID before deletion
-    def deleteDataInTable(self , tableName , iDValue , commit = True , raiseError = True , updateId = True):
+    def deleteDataInTable(self , tableName , iDValue , commit = True , raiseError = True):
 
 
         # setting up table names
@@ -763,7 +744,7 @@ class SqliteCipher:
             for i in result:
                 
                 # if the ID passed is same as found in data base , then pick up the encrypted version of it from data base
-                if(int(self.decryptor(i[0])) == int(iDValue)):
+                if(str(self.decryptor(i[0])) == str(iDValue)):
                     iDValue = i[0]
                     found = True
                     break
@@ -787,7 +768,7 @@ class SqliteCipher:
                 for i in result:
 
                     # if present make found = True
-                    if(int(i[0]) == int(iDValue)):
+                    if(str(i[0]) == str(iDValue)):
                         found = True
                         break
 
@@ -799,34 +780,7 @@ class SqliteCipher:
 
         # exe command
         result = self.sqlObj.execute(stringToExe)
-        
-        # if update id is required
-        if(updateId):
-            self.updateIDs(tableName , False)
-            
 
-        # commit if wanted
-        if(commit):
-            self.sqlObj.commit()
-
-
-
-    def updateIDs(self , tableName , commit = True):
-
-        # assume ID we total 7 IDS
-        # lets say we delete ID = 5 from table then table will still have 0 1 2 3 4 6 ID row , which is not in order
-        # we will traverse the data in table and start from 0 
-        # if at 0 ID is 0 , then fine else make it 0
-        # if at 1 ID is 1 , then fine else make it 1
-        # and so on
-        colList , result = self.getDataFromTable(tableName , omitID=False)
-
-        count = 0
-        for i in result:
-            if(i[0] != count):
-                self.updateInTable(tableName , i[0] , 'ID' , count , False)
-
-            count = count + 1 
 
         # commit if wanted
         if(commit):
@@ -897,7 +851,7 @@ class SqliteCipher:
             for i in result:
                 
                 # if the ID passed is same as found in data base , then pick up the encrypted version of it from data base
-                if(int(self.decryptor(i[0])) == int(iDValue)):
+                if(str(self.decryptor(i[0])) == str(iDValue)):
                     iDValue = i[0]
                     found = True
                     break
@@ -924,7 +878,7 @@ class SqliteCipher:
                 for i in result:
 
                     # if present make found = True
-                    if(int(i[0]) == int(iDValue)):
+                    if(str(i[0]) == str(iDValue)):
                         found = True
                         break
 
